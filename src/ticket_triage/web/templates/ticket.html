@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}{{ ticket.subject or 'Ticket' }}{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>{{ ticket.subject or '(no subject)' }}</h1>
+    <div class="muted">{{ ticket.source }}/{{ ticket.external_id }} · received {{ ticket.received_at | utc('%d %b %Y %H:%M:%S') }} UTC</div>
+  </div>
+  <a class="btn secondary" href="/tickets">All tickets</a>
+</div>
+
+<div class="grid review" style="margin-bottom:16px">
+  <section class="card">
+    <dl class="meta">
+      <dt>From</dt><dd>{{ ticket.sender_name or '' }} {% if ticket.sender_email %}&lt;{{ ticket.sender_email }}&gt;{% endif %}</dd>
+      <dt>Channel</dt><dd>{{ ticket.channel }}</dd>
+    </dl>
+    <pre class="message">{{ ticket.body }}</pre>
+  </section>
+  <section class="card">
+    <h2>Result</h2>
+    <dl class="meta">
+      <dt>Status</dt><dd>{{ ticket.status.value | replace('_', ' ') }}</dd>
+      <dt>Path</dt><dd>{{ (ticket.processing_path.value if ticket.processing_path else '—') | replace('_', ' ') }}</dd>
+      <dt>Category</dt><dd>{{ (ticket.category or '—') | replace('_', ' ') }}{% if ticket.team %} → {{ ticket.team }}{% endif %}</dd>
+      <dt>Priority</dt><dd>{% if ticket.priority %}<span class="badge {{ ticket.priority }}">{{ ticket.priority }}</span>{% else %}—{% endif %}</dd>
+      <dt>Summary</dt><dd>{{ ticket.summary or '—' }}</dd>
+      <dt>Language</dt><dd>{{ ticket.language or '—' }} · {{ ticket.sentiment or '—' }}</dd>
+      <dt>Time to triage</dt><dd>{{ ((ticket.triaged_at - ticket.received_at).total_seconds() if ticket.triaged_at else none) | duration }}</dd>
+      {% for key, value in (ticket.customer or {}).items() if value %}
+      <dt>{{ key | replace('_', ' ') | capitalize }}</dt><dd>{{ value }}</dd>
+      {% endfor %}
+      <dt>HubSpot</dt>
+      <dd>
+        {% if ticket.crm_ticket_id %}
+          {% if hubspot_portal_id %}<a href="https://app.hubspot.com/contacts/{{ hubspot_portal_id }}/ticket/{{ ticket.crm_ticket_id }}" target="_blank" rel="noopener">ticket {{ ticket.crm_ticket_id }}</a>{% else %}ticket {{ ticket.crm_ticket_id }}{% endif %}
+          {% if ticket.crm_contact_id %}· contact {{ ticket.crm_contact_id }}{% endif %}
+        {% elif ticket.crm_error %}<span class="error">{{ ticket.crm_error }}</span>
+        {% else %}—{% endif %}
+      </dd>
+    </dl>
+  </section>
+</div>
+
+<section class="card table-card" style="margin-bottom:16px">
+  <table>
+    <thead><tr><th>Model run</th><th>Output</th><th class="num">Tokens in / out</th><th class="num">Latency</th><th class="num">Cost</th></tr></thead>
+    <tbody>
+      {% for run in ticket.triage_runs %}
+      <tr>
+        <td class="nowrap">{{ run.provider }}{% if run.shadow %} <span class="badge">shadow</span>{% endif %}<div class="mono">{{ run.model }}</div><div class="muted small">prompt {{ run.prompt_version }}</div></td>
+        <td>
+          {% if run.output %}{{ run.output.category | replace('_', ' ') }} · {{ run.output.priority }} · {{ '%.0f' | format(run.output.confidence * 100) }}%<div class="muted small">{{ run.output.rationale }}</div>
+          {% else %}<span class="error">{{ run.error }}</span>{% endif %}
+        </td>
+        <td class="num">{{ run.input_tokens }} / {{ run.output_tokens }}</td>
+        <td class="num">{{ (run.latency_ms / 1000) | duration }}</td>
+        <td class="num">${{ '%.5f' | format(run.cost_usd) }}</td>
+      </tr>
+      {% else %}
+      <tr><td colspan="5" class="muted">No model runs yet.</td></tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+{% if ticket.review_tasks %}
+<section class="card table-card">
+  <table>
+    <thead><tr><th>Review</th><th>Reasons</th><th>Decided by</th><th>Changed fields</th></tr></thead>
+    <tbody>
+      {% for task in ticket.review_tasks %}
+      <tr>
+        <td>{{ task.kind.value | replace('_', ' ') }} · {{ task.status.value }}</td>
+        <td>{% for r in task.reasons %}<span class="badge">{{ r | replace('_', ' ') }}</span> {% endfor %}</td>
+        <td>{{ reviewers.get(task.decided_by, '—') }}{% if task.decided_at %}<div class="muted small">{{ task.decided_at | utc('%d %b %H:%M') }}</div>{% endif %}</td>
+        <td>{% if task.changed_fields %}{{ task.changed_fields | join(', ') }}{% elif task.kind.value == 'verify_ai' and task.decided_at %}none, AI accepted{% else %}—{% endif %}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+{% endif %}
+{% endblock %}

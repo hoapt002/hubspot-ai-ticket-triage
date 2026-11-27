@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Already reviewed{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Already reviewed</h1>
+  <p class="muted">This ticket was decided {{ task.decided_at | utc('%d %b %Y %H:%M') if task.decided_at else '' }}.</p>
+  <p><a class="btn secondary" href="/tickets/{{ task.ticket_id }}">View ticket</a> <a class="btn" href="/queue">Back to queue</a></p>
+</div>
+{% endblock %}

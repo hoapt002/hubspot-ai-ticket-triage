@@ -1,0 +1,9 @@
+{% extends "base.html" %}
+{% block title %}Could not save{% endblock %}
+{% block content %}
+<div class="card">
+  <h1>Could not save</h1>
+  <p class="error">{{ message }}</p>
+  <p><a class="btn secondary" href="{{ back_url }}">Back</a></p>
+</div>
+{% endblock %}

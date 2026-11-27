@@ -1,0 +1,40 @@
+{% extends "base.html" %}
+{% block title %}Tickets{% endblock %}
+{% macro status_badge(s) -%}
+{%- set cls = {'synced': 'ok', 'crm_disabled': 'ok', 'triaged': 'info', 'awaiting_review': 'warn', 'awaiting_manual': 'warn', 'failed': 'bad'}.get(s.value, '') -%}
+<span class="badge {{ cls }}">{{ s.value | replace('_', ' ') }}</span>
+{%- endmacro %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Tickets</h1>
+    <div class="muted">Latest 200 received.</div>
+  </div>
+  <div class="filters">
+    <a href="/tickets" class="{{ 'active' if not status }}">all</a>
+    {% for s in statuses %}<a href="/tickets?status={{ s.value }}" class="{{ 'active' if status == s.value }}">{{ s.value | replace('_', ' ') }}</a>{% endfor %}
+  </div>
+</div>
+<section class="card table-card">
+  {% if tickets %}
+  <table>
+    <thead><tr><th>Ticket</th><th>Status</th><th>Category</th><th>Priority</th><th>Path</th><th class="num">Time to triage</th><th class="num hide-sm">Received</th></tr></thead>
+    <tbody>
+      {% for t in tickets %}
+      <tr>
+        <td><a class="subject" href="/tickets/{{ t.id }}">{{ t.subject or '(no subject)' }}</a><div class="muted small">{{ t.sender_email or '' }}</div></td>
+        <td>{{ status_badge(t.status) }}</td>
+        <td>{{ (t.category or '—') | replace('_', ' ') }}</td>
+        <td>{% if t.priority %}<span class="badge {{ t.priority }}">{{ t.priority }}</span>{% else %}—{% endif %}</td>
+        <td class="muted">{{ (t.processing_path.value if t.processing_path else '—') | replace('_', ' ') }}</td>
+        <td class="num">{{ ((t.triaged_at - t.received_at).total_seconds() if t.triaged_at else none) | duration }}</td>
+        <td class="num muted hide-sm">{{ t.received_at | utc('%d %b %H:%M') }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">No tickets yet. Point a webhook at <span class="mono">/webhooks/tickets/&lt;source&gt;</span>.</div>
+  {% endif %}
+</section>
+{% endblock %}

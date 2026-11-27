@@ -1,0 +1,72 @@
+# Ticket taxonomy and routing policy.
+# Edit this file to match your support organisation; the prompt, the review
+# form and the HubSpot mapping are all generated from it.
+
+categories:
+  billing:
+    description: Invoices, charges, payment methods, failed payments, VAT/receipt requests.
+    team: billing
+    hubspot_category: BILLING_ISSUE
+  refund_return:
+    description: Customer asks for money back, a return label, or an exchange.
+    team: billing
+    hubspot_category: BILLING_ISSUE
+  cancellation:
+    description: Customer wants to cancel or downgrade a subscription or close the account.
+    team: retention
+    hubspot_category: GENERAL_INQUIRY
+  account_access:
+    description: Login problems, password reset, 2FA, locked or compromised accounts.
+    team: support_tier1
+    hubspot_category: PRODUCT_ISSUE
+  technical_issue:
+    description: Errors, outages, bugs, integrations or features not working as documented.
+    team: support_tier2
+    hubspot_category: PRODUCT_ISSUE
+  shipping_delivery:
+    description: Order status, late or lost parcels, wrong address, damaged on arrival.
+    team: fulfillment
+    hubspot_category: GENERAL_INQUIRY
+  product_question:
+    description: How-to questions, pricing questions, pre-sales questions about features.
+    team: support_tier1
+    hubspot_category: GENERAL_INQUIRY
+  feature_request:
+    description: Suggestions for new functionality or changes to existing behaviour.
+    team: product
+    hubspot_category: FEATURE_REQUEST
+  complaint:
+    description: Dissatisfaction with service or staff, escalation requests, legal threats.
+    team: escalations
+    hubspot_category: GENERAL_INQUIRY
+  other:
+    description: Anything that clearly does not fit the categories above (spam, partnerships, press).
+    team: support_tier1
+    hubspot_category: GENERAL_INQUIRY
+
+priorities:
+  P1:
+    description: Service down, security incident, data loss, payment taken but service not delivered, legal threat.
+    sla_hours: 1
+    hubspot_priority: HIGH
+  P2:
+    description: Customer blocked from a core task, or a paying customer is affected with no workaround.
+    sla_hours: 4
+    hubspot_priority: HIGH
+  P3:
+    description: Problem with a workaround, or a time-sensitive question.
+    sla_hours: 24
+    hubspot_priority: MEDIUM
+  P4:
+    description: General questions, feedback and feature requests with no time pressure.
+    sla_hours: 72
+    hubspot_priority: LOW
+
+review_policy:
+  # Below this model-reported confidence a person verifies the result.
+  min_confidence: 0.75
+  # These are always verified by a person before reaching the CRM.
+  always_review_priorities: [P1]
+  always_review_categories: [cancellation, complaint]
+  # A ticket without these extracted fields cannot be matched to a CRM contact.
+  required_customer_fields: [email]

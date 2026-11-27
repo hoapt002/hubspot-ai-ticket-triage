@@ -1,0 +1,95 @@
+{% extends "base.html" %}
+{% block title %}Review{% endblock %}
+{% block content %}
+{% set manual = task.kind.value == 'manual_triage' %}
+{% set p = task.proposal or {} %}
+<div class="page-head">
+  <div>
+    <h1>{{ 'Manual triage' if manual else 'Verify AI triage' }}</h1>
+    <div class="muted">
+      {% for r in task.reasons %}<span class="badge {{ 'warn' if r != 'baseline_sample' }}">{{ r | replace('_', ' ') }}</span> {% endfor %}
+      {% if manual and 'baseline_sample' in task.reasons %}Randomly sampled to measure manual handling time. AI output is hidden on purpose.{% endif %}
+    </div>
+  </div>
+  <a class="btn secondary" href="/queue">Back to queue</a>
+</div>
+
+<div class="grid review">
+  <section class="card">
+    <h2>{{ ticket.subject or '(no subject)' }}</h2>
+    <dl class="meta">
+      <dt>From</dt><dd>{{ ticket.sender_name or '' }} {% if ticket.sender_email %}&lt;{{ ticket.sender_email }}&gt;{% endif %}</dd>
+      <dt>Channel</dt><dd>{{ ticket.channel }} · {{ ticket.source }}</dd>
+      <dt>Received</dt><dd>{{ ticket.received_at | utc('%d %b %Y %H:%M') }} UTC</dd>
+    </dl>
+    <pre class="message">{{ ticket.body }}</pre>
+  </section>
+
+  <form class="card" method="post" action="/reviews/{{ task.id }}">
+    <input type="hidden" name="csrf" value="{{ csrf }}">
+    <input type="hidden" name="review_session_id" value="{{ review_session_id }}">
+    {% if p.rationale %}
+    <div class="rationale">
+      <strong>AI reasoning ({{ '%.0f' | format(p.confidence * 100) }}% confident):</strong> {{ p.rationale }}
+      {% if p.needs_human_reason %}<br><strong>Flag:</strong> {{ p.needs_human_reason }}{% endif %}
+    </div>
+    {% endif %}
+    <fieldset>
+      <legend>Classification</legend>
+      <div class="field-row">
+        <div class="field">
+          <label for="category">Category</label>
+          <select id="category" name="category" required>
+            {% if manual %}<option value="" selected disabled>Choose…</option>{% endif %}
+            {% for key, cat in taxonomy.categories.items() %}
+            <option value="{{ key }}" title="{{ cat.description }}" {{ 'selected' if p.category == key }}>{{ key | replace('_', ' ') }}</option>
+            {% endfor %}
+          </select>
+        </div>
+        <div class="field">
+          <label for="priority">Priority</label>
+          <select id="priority" name="priority" required>
+            {% if manual %}<option value="" selected disabled>Choose…</option>{% endif %}
+            {% for key, pr in taxonomy.priorities.items() %}
+            <option value="{{ key }}" title="{{ pr.description }}" {{ 'selected' if p.priority == key }}>{{ key }} · respond within {{ pr.sla_hours }}h</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+      <div class="field">
+        <label for="summary">Summary for the agent</label>
+        <textarea id="summary" name="summary" rows="3" required>{{ p.summary or '' }}</textarea>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label for="language">Language (ISO code)</label>
+          <input id="language" type="text" name="language" value="{{ p.language or '' }}" maxlength="16">
+        </div>
+        <div class="field">
+          <label for="sentiment">Sentiment</label>
+          <select id="sentiment" name="sentiment">
+            {% for s in ['neutral', 'positive', 'negative', 'angry'] %}
+            <option value="{{ s }}" {{ 'selected' if p.sentiment == s }}>{{ s }}</option>
+            {% endfor %}
+          </select>
+        </div>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>Customer</legend>
+      <div class="field-row">
+        {% for f in customer_fields %}
+        <div class="field">
+          <label for="customer_{{ f }}">{{ f | replace('_', ' ') | capitalize }}</label>
+          <input id="customer_{{ f }}" type="{{ 'email' if f == 'email' else 'text' }}" name="customer_{{ f }}"
+                 value="{{ prefill.customer.get(f) or '' }}" {{ 'required' if f in taxonomy.review_policy.required_customer_fields }}>
+        </div>
+        {% endfor %}
+      </div>
+    </fieldset>
+    <div class="actions">
+      <button class="btn" type="submit">{{ icon('profile-tick', 16) }} Confirm and send to CRM</button>
+    </div>
+  </form>
+</div>
+{% endblock %}

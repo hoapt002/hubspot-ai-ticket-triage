@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Ticket Triage{% endblock %} · Ticket Triage</title>
+  <link rel="icon" href="{{ url_for('static', path='favicon.svg') }}" type="image/svg+xml">
+  <link rel="stylesheet" href="{{ url_for('static', path='app.css') }}">
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="/">{{ icon('flash', 20) }} <span class="brand-name">Ticket Triage</span></a>
+    <nav class="nav">
+      <a href="/" class="{{ 'active' if active == 'dashboard' }}">{{ icon('chart-2', 16) }} Impact</a>
+      <a href="/queue" class="{{ 'active' if active == 'queue' }}">{{ icon('task-square', 16) }} Review queue</a>
+      <a href="/tickets" class="{{ 'active' if active == 'tickets' }}">{{ icon('message-text', 16) }} Tickets</a>
+    </nav>
+    <div class="userbox">
+      <span class="hide-sm">{{ user_name }}</span>
+      <form method="post" action="/logout">
+        <input type="hidden" name="csrf" value="{{ csrf }}">
+        <button class="btn link" type="submit" title="Sign out">{{ icon('logout', 18) }}</button>
+      </form>
+    </div>
+  </header>
+  <main class="page">
+    {% block content %}{% endblock %}
+  </main>
+</body>
+</html>

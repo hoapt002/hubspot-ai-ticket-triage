@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Review queue{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div>
+    <h1>Review queue</h1>
+    <div class="muted">Oldest first. Opening a ticket starts its touch-time clock.</div>
+  </div>
+</div>
+{% if request.query_params.get('done') %}
+<div class="notice ok">{{ icon('profile-tick', 18) }} Saved. {{ 'The ticket is being created in HubSpot.' if hubspot_enabled else 'The ticket is triaged (no CRM connected).' }} <a href="/tickets/{{ request.query_params.get('done') }}">View ticket</a></div>
+{% endif %}
+<section class="card table-card">
+  {% if tasks %}
+  <table>
+    <thead><tr><th>Ticket</th><th>Type</th><th>Why a person is needed</th><th>AI proposal</th><th class="num">Waiting</th><th></th></tr></thead>
+    <tbody>
+      {% for task in tasks %}
+      <tr>
+        <td>
+          <div class="subject">{{ task.ticket.subject or '(no subject)' }}</div>
+          <div class="muted small">{{ task.ticket.sender_email or 'unknown sender' }} · {{ task.ticket.channel }}</div>
+        </td>
+        <td>{% if task.kind.value == 'verify_ai' %}<span class="badge info">Verify AI</span>{% else %}<span class="badge">Manual triage</span>{% endif %}</td>
+        <td>{% for r in task.reasons %}<span class="badge {{ 'warn' if r != 'baseline_sample' }}">{{ r | replace('_', ' ') }}</span> {% endfor %}</td>
+        <td>
+          {% if task.proposal %}
+          <span class="badge {{ task.proposal.priority }}">{{ task.proposal.priority }}</span>
+          {{ task.proposal.category | replace('_', ' ') }}
+          <span class="muted small">({{ '%.0f' | format(task.proposal.confidence * 100) }}%)</span>
+          {% else %}<span class="muted">hidden</span>{% endif %}
+        </td>
+        <td class="num muted">{{ task.created_at | timesince }}</td>
+        <td class="num"><a class="btn secondary" href="/reviews/{{ task.id }}">Open</a></td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+  {% else %}
+  <div class="empty">Nothing waiting. New tickets that need a person will appear here.</div>
+  {% endif %}
+</section>
+{% endblock %}

@@ -1,0 +1,121 @@
+{% extends "base.html" %}
+{% block title %}Impact{% endblock %}
+{% block content %}
+{% set labels = {'ai_auto': 'AI, fully automatic', 'ai_reviewed': 'AI + human check', 'manual': 'Manual (baseline)'} %}
+{% set auto = report.paths.get('ai_auto') %}
+{% set reviewed = report.paths.get('ai_reviewed') %}
+{% set manual = report.paths.get('manual') %}
+<div class="page-head">
+  <div>
+    <h1>Business impact</h1>
+    <div class="muted">Measured from tickets received since {{ report.since | utc('%d %b %Y') }}.</div>
+  </div>
+  <div class="filters">
+    {% for d in [7, 30, 90] %}<a href="/?days={{ d }}" class="{{ 'active' if days == d }}">{{ d }} days</a>{% endfor %}
+  </div>
+</div>
+
+{% if not report.baseline_ready %}
+<div class="notice">
+  {{ icon('warning-2', 18) }}
+  <div>
+    Manual baseline: {{ manual.tickets if manual else 0 }} of {{ min_baseline }} tickets measured.
+    {{ (settings_baseline_rate * 100) | round(0) | int }}% of incoming tickets are triaged by hand without AI help;
+    time saved is shown once at least {{ min_baseline }} of them are done.
+  </div>
+</div>
+{% endif %}
+
+<section class="grid kpis">
+  <div class="card kpi">
+    <div class="label">{{ icon('timer-1', 16) }} Agent time saved</div>
+    <div class="value">{% if report.hours_saved is not none %}{{ '%.1f' | format(report.hours_saved) }} h{% else %}—{% endif %}</div>
+    <div class="hint">vs. {{ report.manual_touch_s | duration }} median manual triage per ticket</div>
+  </div>
+  <div class="card kpi">
+    <div class="label">{{ icon('flash', 16) }} Automation rate</div>
+    <div class="value">{% if report.automation_rate is not none %}{{ '%.0f' | format(report.automation_rate * 100) }}%{% else %}—{% endif %}</div>
+    <div class="hint">of AI-triaged tickets needed no person</div>
+  </div>
+  <div class="card kpi">
+    <div class="label">{{ icon('chart-2', 16) }} Time to triage</div>
+    <div class="value">{{ (auto.median_time_to_triage_s if auto else none) | duration }}</div>
+    <div class="hint">
+      median, automatic{% if report.triage_speedup %} · {{ '%.0f' | format(report.triage_speedup) }}× faster than manual{% endif %}
+    </div>
+  </div>
+  <div class="card kpi">
+    <div class="label">{{ icon('profile-tick', 16) }} AI accuracy (blind)</div>
+    <div class="value">{% if report.shadow_accuracy.category is not none %}{{ '%.0f' | format(report.shadow_accuracy.category * 100) }}%{% else %}—{% endif %}</div>
+    <div class="hint">category match vs. manual agents, n = {{ report.shadow_accuracy.sample }}</div>
+  </div>
+</section>
+
+<section class="grid two" style="margin-bottom:16px">
+  <div class="card">
+    <h2>Median time from webhook to classified ticket</h2>
+    {% set max_ttt = [auto.median_time_to_triage_s if auto and auto.median_time_to_triage_s else 0,
+                      reviewed.median_time_to_triage_s if reviewed and reviewed.median_time_to_triage_s else 0,
+                      manual.median_time_to_triage_s if manual and manual.median_time_to_triage_s else 0] | max %}
+    <div class="bars">
+      {% for key, cls in [('ai_auto', ''), ('ai_reviewed', 'reviewed'), ('manual', 'manual')] %}
+      {% set p = report.paths.get(key) %}
+      <div class="bar-row">
+        <div class="bar-head"><span>{{ labels[key] }}</span><strong>{{ (p.median_time_to_triage_s if p else none) | duration }}</strong></div>
+        <div class="bar-track"><div class="bar-fill {{ cls }}" style="width: {{ ((p.median_time_to_triage_s / max_ttt * 100) if p and p.median_time_to_triage_s and max_ttt else 0) | round(1) }}%"></div></div>
+      </div>
+      {% endfor %}
+    </div>
+    <p class="muted small" style="margin:14px 0 0">Includes queue waiting time. Human paths wait for a reviewer to pick the ticket up.</p>
+  </div>
+  <div class="card">
+    <h2>Quality and cost</h2>
+    <table>
+      <tr><td>Blind accuracy, category</td><td class="num">{% if report.shadow_accuracy.category is not none %}{{ '%.0f' | format(report.shadow_accuracy.category * 100) }}%{% else %}—{% endif %}</td></tr>
+      <tr><td>Blind accuracy, priority</td><td class="num">{% if report.shadow_accuracy.priority is not none %}{{ '%.0f' | format(report.shadow_accuracy.priority * 100) }}%{% else %}—{% endif %}</td></tr>
+      <tr><td>Reviewers kept AI category <span class="muted small">(n = {{ report.review_agreement.sample }})</span></td><td class="num">{% if report.review_agreement.category is not none %}{{ '%.0f' | format(report.review_agreement.category * 100) }}%{% else %}—{% endif %}</td></tr>
+      <tr><td>Reviewers kept AI priority</td><td class="num">{% if report.review_agreement.priority is not none %}{{ '%.0f' | format(report.review_agreement.priority * 100) }}%{% else %}—{% endif %}</td></tr>
+      <tr><td>Median model latency</td><td class="num">{{ ((report.median_ai_latency_ms / 1000) if report.median_ai_latency_ms is not none else none) | duration }}</td></tr>
+      <tr><td>LLM spend</td><td class="num">${{ '%.4f' | format(report.llm_cost_usd) }}</td></tr>
+      <tr><td>LLM cost per ticket</td><td class="num">{% if report.llm_cost_per_ticket_usd is not none %}${{ '%.5f' | format(report.llm_cost_per_ticket_usd) }}{% else %}—{% endif %}</td></tr>
+    </table>
+  </div>
+</section>
+
+<section class="card table-card" style="margin-bottom:16px">
+  <table>
+    <thead>
+      <tr>
+        <th>Handling path</th><th class="num">Tickets</th><th class="num">Median time to triage</th>
+        <th class="num">p90 time to triage</th><th class="num">Median agent touch time</th>
+        <th class="num">Agent time spent</th><th class="num">LLM cost</th>
+      </tr>
+    </thead>
+    <tbody>
+      {% for key in ['ai_auto', 'ai_reviewed', 'manual'] %}
+      {% set p = report.paths.get(key) %}
+      <tr>
+        <td>{{ labels[key] }}</td>
+        <td class="num">{{ p.tickets if p else 0 }}</td>
+        <td class="num">{{ (p.median_time_to_triage_s if p else none) | duration }}</td>
+        <td class="num">{{ (p.p90_time_to_triage_s if p else none) | duration }}</td>
+        <td class="num">{{ ((p.median_touch_s if p else none) if key != 'ai_auto' else 0) | duration }}</td>
+        <td class="num">{{ (p.total_touch_s if p else 0) | duration }}</td>
+        <td class="num">${{ '%.4f' | format(p.llm_cost_usd if p else 0) }}</td>
+      </tr>
+      {% endfor %}
+    </tbody>
+  </table>
+</section>
+
+<section class="card">
+  <h2>Pipeline status</h2>
+  <div class="filters">
+    <span class="badge">received {{ report.received }}</span>
+    {% for status, n in report.status_counts | dictsort %}
+    <a href="/tickets?status={{ status }}">{{ status | replace('_', ' ') }} · {{ n }}</a>
+    {% endfor %}
+    <a href="/queue">open reviews · {{ report.open_reviews }}</a>
+  </div>
+</section>
+{% endblock %}
